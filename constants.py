@@ -4,7 +4,7 @@ brawler_stats_dict = json.load(open("brawler_stats.json"))
 
 class Constants:
     #! change the brawler name, if its not found please manually change the stats it below
-    brawler_name = " "
+    brawler_name = "shelly"
     
     #! Change the speed and range for the brawler you are using
     """
@@ -14,9 +14,9 @@ class Constants:
     eg. eve's speed (2.4), attack_range (9.33) and
     height scale factor (0.158)
     """
-    speed = 2.4 # units: (tiles per second)
-    attack_range = 9.33 # units: (tiles per second)
-    heightScaleFactor = 0.158
+    speed = 2.57 # units: (tiles per second)
+    attack_range = 7.67 # units: (tiles per second)
+    heightScaleFactor = 0.154
     
     #! Change this to suit the current map
     # map's characteristic
@@ -30,16 +30,16 @@ class Constants:
     name to name located on the top left corner of your bluestacks
     eg. Bluestacks App Player 1, Bluestacks App Player 2, etc
     """
-    window_name = "Bluestacks App Player"
+    window_name = "Bluestacks App Player 1"
     # Make this False if detection_test is outputing a blank screen, otherwise True.
-    focused_window = True
+    focused_window = False
 
     #! Change this to True if you have Nvidia graphics card and CUDA installed
     nvidia_gpu = False
     
     #! Do not change these
     # Main contants
-    DEBUG = False
+    DEBUG = True
     # Detector constants
     classes = ["Player","Bush","Enemy","Cubebox"]
     """
