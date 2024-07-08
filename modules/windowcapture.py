@@ -4,7 +4,7 @@ from threading import Thread, Lock
 from ctypes import windll
 import tkinter
 from time import time
-from constants import Constants
+from settings import Settings
 
 class WindowCapture:
 
@@ -45,7 +45,7 @@ class WindowCapture:
         else:
             self.hwnd = win32gui.FindWindow(None, window_name)
             if not self.hwnd:
-                raise Exception(f"{window_name} not found. \nPlease open {window_name} or change the window_name at constants.py")
+                raise Exception(f"{window_name} not found. \nPlease open {window_name} or change the window_name at settings.py")
 
         # get the window size
         window_rect = win32gui.GetWindowRect(self.hwnd)
@@ -75,13 +75,29 @@ class WindowCapture:
         self.offset_y = window_rect[1] + self.cropped_y
         self.offsets = (self.offset_x,self.offset_y)
 
-        if Constants.focused_window:
+        if Settings.focused_window:
             self.window = self.hwnd
             self.cropped = (self.cropped_x,self.cropped_y)
         else:
             self.window = None
             self.cropped = (self.offset_x,self.offset_y)
+
+    # translate a pixel position on a screenshot image to a pixel position on the screen.
+    # pos = (x, y)
+    # WARNING: if you move the window being captured after execution is started, this will
+    # return incorrect coordinates, because the window position is only calculated in
+    # the __init__ constructor.
+    def get_screen_position(self, cordinate):
+        """
+        Apply bluestacks' window offset
+        :param cordinate (tuple): cordinate in the cropped screenshot
+        :return: cordinate with offset applied
+        """
+        return (cordinate[0] + self.offset_x, cordinate[1] + self.offset_y)
     
+    def get_window_center(self):
+        return (self.w//2,self.h//2 + int(self.h*Settings.midpointOffsetScale))
+
     # https://stackoverflow.com/a/15503675
     def set_window(self):
         """

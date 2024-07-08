@@ -1,7 +1,7 @@
 from threading import Thread, Lock
 from time import time
 import cv2 as cv
-from constants import Constants
+from settings import Settings
 from ultralytics import YOLO
 
 class Detection:
@@ -12,13 +12,14 @@ class Detection:
     # properties
     screenshot = None
     results = None
+    height = None
     fps = 0
     avg_fps = 0
     player_topleft = None
     player_bottomright = None
-    midpoint_offset = Constants.midpoint_offset
+    midpoint_offset = Settings.midpointOffsetScale
 
-    def __init__(self, windowSize, model_file_path, classes, heightScaleFactor):
+    def __init__(self, windowSize, model_file_path, classes):
         """
         Constructor for the Detection class
         """
@@ -26,19 +27,40 @@ class Detection:
         self.lock = Lock()
         # load the trained model
         self.model = YOLO(model_file_path,task="detect")
+        if Settings.nvidia_gpu:
+            self.model.cuda()
         self.classes = classes
         self.windowSize = windowSize
         self.w = windowSize[0]
         self.h = windowSize[1]
-        self.height = heightScaleFactor * self.h
+        self.midpoint = (int(self.w/2),int((self.h/2)+self.midpoint_offset))
+        
 
+        if Settings.heightScale:
+            self.heightScale = Settings.heightScale
+        else:
+            self.heightScale = 0.15 # default hsf
+        self.height = self.h * self.heightScale
+
+    # The find_midpoint function finds the midpoint of the bounding box of the detection
+    # x2 > x1, y2 > y1
     def find_midpoint(self,x1,y1,x2,y2):
-        #x2 > x1
-        #y2 > y1
-        """
-        find the midpoint between two
-        """
         return [(x1+int((x2-x1)/2),y1+int((y2-y1)/2))]
+
+    def caculate_heightScale(self):
+        results = self.model.predict(self.screenshot, imgsz=Settings.imgsz,
+                                        half=Settings.half, verbose=False)
+        result = results[0]
+        for box in result.boxes:
+            x1, y1, x2, y2 = [round(x) for x in box.xyxy[0].tolist()]
+            class_id = int(box.cls[0].item())
+            prob = round(box.conf[0].item(), 2)
+            threshold = Settings.threshold[class_id]
+            if prob >= threshold:
+                midpoint = self.find_midpoint(x1,y1,x2,y2)
+                if self.classes[class_id] == "Player":
+                    return abs(midpoint[0][1] - self.midpoint[1])/self.h
+
 
     def annotate_detection_midpoint(self):
         """
@@ -76,7 +98,7 @@ class Detection:
         yBottom = int(yBorder*((tile_h+size)/2))+self.midpoint_offset
         
         cv.rectangle(self.screenshot, (xTop, yTop), (xBottom, yBottom), (0,255,0), 2)
-        cv.drawMarker(self.screenshot, (int(self.w/2),int((self.h/2)+self.midpoint_offset)),
+        cv.drawMarker(self.screenshot,self.midpoint,
                     green ,thickness=thickness,markerType= cv.MARKER_CROSS,
                     line_type=cv.LINE_AA, markerSize=50)
         #quadrant line
@@ -139,14 +161,14 @@ class Detection:
             if not self.screenshot is None:
                 # create empty nested list
                 tempList = len(self.classes)*[[]]
-                results = self.model.predict(self.screenshot, imgsz=Constants.imgsz,
-                                             half=Constants.half, verbose=False)
+                results = self.model.predict(self.screenshot, imgsz=Settings.imgsz,
+                                             half=Settings.half, verbose=False)
                 result = results[0]
                 for box in result.boxes:
                     x1, y1, x2, y2 = [round(x) for x in box.xyxy[0].tolist()]
                     class_id = int(box.cls[0].item())
                     prob = round(box.conf[0].item(), 2)
-                    threshold = Constants.threshold[class_id]
+                    threshold = Settings.threshold[class_id]
                     if prob >= threshold:
                         midpoint = self.find_midpoint(x1,y1,x2,y2)
                         if self.classes[class_id] == "Player":

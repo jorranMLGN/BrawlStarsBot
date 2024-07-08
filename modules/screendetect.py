@@ -6,7 +6,7 @@ e.g. play again button - When play again button is detect by pyautogui.pixelMatc
 import pyautogui as py
 from threading import Thread, Lock
 from time import sleep
-from constants import Constants
+from settings import Settings
 
 """
 IDLE: When state exit,play and load is finished, state is changed to IDLE so
@@ -60,20 +60,45 @@ class Screendetect:
         self.offset_y = offset[1]
 
         # Coordinate
-        self.defeated1 = (round(self.w*0.9656)+self.offset_x, round(self.h*0.152)+self.offset_y)
-        self.defeated2 = (round(self.w*0.993)+self.offset_x, round(self.h*0.2046)+self.offset_y)
+        self.defeated1 = self.round_offset_cord(0.9683,0.1969)
+        self.defeated2 = self.round_offset_cord(0.993,0.2046)
 
-        self.starDrop1 = (round(self.w*0.488)+ self.offset_x, round(self.h*0.9303) + self.offset_y)
-        self.starDrop2 = (round(self.w*0.5228)+ self.offset_x, round(self.h*0.9296) + self.offset_y)
+        self.starDrop1 = self.round_offset_cord(0.488,0.9303)
+        self.starDrop2 = self.round_offset_cord(0.5228,0.9296)
+            
+            # buttons
+        self.playAgainButton = self.round_offset_cord(0.5903,0.9197)
+        self.playButton = self.round_offset_cord(0.9419,0.8949)
+        self.exitButton = self.round_offset_cord(0.493,0.9187)
+        self.loadButton = self.round_offset_cord(0.8057,0.9675)
+        self.proceedButton = self.round_offset_cord(0.8093,0.9165)
 
-        self.playAgainButton = (round(self.w*0.5903)+self.offset_x, round(self.h*0.9197)+self.offset_y)
-        self.playButton = (round(self.w*0.9419)+self.offset_x, round(self.h*0.8949)+self.offset_y)
-        self.exitButton = (round(self.w*0.493)+self.offset_x, round(self.h*0.9187)+self.offset_y)
-        self.loadButton = (round(self.w*0.8057)+self.offset_x, round(self.h*0.9675)+self.offset_y)
-        self.proceedButton = (round(self.w*0.8093)+self.offset_x, round(self.h*0.9165)+self.offset_y)
+        self.connection_lost_cord = self.round_offset_cord(0.4912,0.5525)
+        self.reload_button = self.round_offset_cord(0.2824,0.5812)
 
-        self.connection_lost_cord = (round(self.w*0.4912)+self.offset_x,round(self.h*0.5525)+self.offset_y)
-        self.reload_button = (round(self.w*0.2824)+self.offset_x,round(self.h*0.5812)+self.offset_y)
+    
+    def round_offset_cord(self,x,y):
+        return (round(self.w*x)+self.offset_x, round(self.h*y)+self.offset_y)
+
+    def goto_training(self,delay=1):
+        menu = self.round_offset_cord(0.9525,0.0454)
+        setting = self.round_offset_cord(0.8676,0.1373)
+        editControl = self.round_offset_cord(0.2061,0.3854)
+        
+        sleep(delay)
+        py.click(menu)
+        sleep(delay)
+        py.click(setting)
+        sleep(delay)
+        py.click(editControl)
+
+    def exit_training(self):
+        exitTraining = self.round_offset_cord(0.5772,0.922)
+        back = self.round_offset_cord(0.043,0.043)
+        py.click(exitTraining)
+        sleep(5)
+        py.click(back)
+        py.click(back)
 
     def update_bot_stop(self,bot_stopped):
         self.bot_stopped = bot_stopped
@@ -111,7 +136,7 @@ class Screendetect:
                     elif py.pixelMatchesColor(self.loadButton[0], self.loadButton[1],self.loadColor,tolerance=30):
                         print("Loading in")
                         self.lock.acquire()
-                        sleep(3)
+                        sleep(6)
                         self.state = Detectstate.LOAD
                         self.lock.release()
                     
@@ -169,7 +194,7 @@ class Screendetect:
             
             elif self.state == Detectstate.EXIT:
                 # release movement key
-                py.mouseUp(button = Constants.movement_key)
+                py.mouseUp(button = Settings.movement_key)
                 sleep(5)
                 # click the exit button
                 py.click(x=self.exitButton[0], y=self.exitButton[1], button="left")

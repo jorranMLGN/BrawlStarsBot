@@ -7,29 +7,27 @@ from modules.detection import Detection
 from modules.print import bcolors
 import pyautogui as py
 import os
-from constants import Constants
+from settings import Settings
 
 def stop_all_thread(wincap,screendetect,bot,detector):
     """
     stop all thread from running
     """
-    py.mouseUp(button = Constants.movement_key)
+    py.mouseUp(button = Settings.movement_key)
     wincap.stop()
     detector.stop()
     screendetect.stop()
     bot.stop()
     cv.destroyAllWindows()
 
-def add_two_tuple(tup1,tup2):
-    """
-    add two tuples
-    """
+# The add_two_tuple function sums two tuple together
+def add_two_tuple(tup1:tuple,tup2:tuple) -> tuple:
     if not(tup1 is None or tup2 is None):
         return tuple(map(sum, zip(tup1, tup2)))
 
 def main():
     # initialize the WindowCapture class
-    wincap = WindowCapture(Constants.window_name)
+    wincap = WindowCapture(Settings.window_name)
     # get window dimension
     windowSize = wincap.get_dimension()
     # set target window as foreground
@@ -37,18 +35,17 @@ def main():
     wincap.set_window()
 
     # initialize detection class
-    detector = Detection(windowSize,Constants.model_file_path,Constants.classes,Constants.heightScaleFactor)
+    detector = Detection(windowSize,Settings.model_file_path,Settings.classes)
     # initialize screendectect class
     screendetect = Screendetect(windowSize,wincap.offsets)
     # initialize bot class
-    bot = Brawlbot(windowSize, wincap.offsets, Constants.speed, Constants.attack_range)
+    bot = Brawlbot(windowSize, wincap.offsets, Settings.movementSpeed, Settings.attackRange)
     
     # move cursor to the middle of bluestacks
-    middle_of_window = (int(wincap.w/2+wincap.offset_x),int(wincap.h/2+wincap.offset_y))
-    py.moveTo(middle_of_window[0],middle_of_window[1])
+    windowMiddle = (int(wincap.w/2+wincap.offset_x),int(wincap.h/2+wincap.offset_y))
+    py.moveTo(windowMiddle[0],windowMiddle[1])
 
     #start thread
-    wincap.start()
     detector.start()
     screendetect.start()
     
@@ -88,20 +85,20 @@ def main():
             or screendetect.state ==  Detectstate.CONNECTION
             or screendetect.state ==  Detectstate.PLAY
             or screendetect.state == Detectstate.PROCEED):
-            py.mouseUp(button = Constants.movement_key)
+            py.mouseUp(button = Settings.movement_key)
             bot.stop()
         elif screendetect.state ==  Detectstate.LOAD:
             if bot.stopped:
                 #wait for game to load
                 sleep(4)
-                print("starting bot")
+                print("Starting Bot!")
                 # reset timestamp and state
                 bot.timestamp = time()
                 bot.state = BotState.INITIALIZING
                 bot.start()
 
         # display annotated window with FPS
-        if Constants.DEBUG:
+        if Settings.DEBUG:
             detector.annotate_detection_midpoint()
             detector.annotate_border(bot.border_size,bot.tile_w,bot.tile_h)
             detector.annotate_fps(wincap.avg_fps)
@@ -109,19 +106,20 @@ def main():
 
         # Press q to exit the script
         key = cv.waitKey(1)
-        x_mouse, y_mouse = py.position()
+        xMouse, Mouse = py.position()
         if wincap.screen_resolution[1] == (windowSize[1]+wincap.titlebar_pixels+1):
-            stop_bool = x_mouse > (wincap.offset_x + wincap.w)
+            stopBool = xMouse > (wincap.offset_x + wincap.w)
         else:
-            stop_bool = ((x_mouse > 0 and x_mouse < wincap.left and y_mouse > 0 and y_mouse < wincap.top)
-            or ( x_mouse > wincap.right and x_mouse < wincap.screen_resolution[0]
-                and y_mouse > wincap.bottom and y_mouse < wincap.screen_resolution[1]))
+            stopBool = ((xMouse > 0 and xMouse < wincap.left and Mouse > 0 and Mouse < wincap.top)
+            or ( xMouse > wincap.right and xMouse < wincap.screen_resolution[0]
+                and Mouse > wincap.bottom and Mouse < wincap.screen_resolution[1]))
         
-        if (key == ord('q') or stop_bool):
+        if (key == ord('q') or stopBool):
             #stop all threads
             stop_all_thread(wincap,screendetect,bot,detector)
             break
-    print(bcolors.WARNING +'Cursor currently not on Bluestacks, exiting bot...' +bcolors.ENDC)
+
+    print(bcolors.WARNING +'Cursor currently not on Bluestacks, exiting bot...' + bcolors.ENDC)
     stop_all_thread(wincap,screendetect,bot,detector)
 
 if __name__ == "__main__":
@@ -129,11 +127,11 @@ if __name__ == "__main__":
     print(bcolors.HEADER + bcolors.BOLD +
               "Before starting the bot, make sure you have Brawl Stars open \non Bluestacks and selected solo showdown gamemode.")
     print("")
-    print("Also make sure to change the speed, attack_range and HeightScaleFactor"
-            +"\nfor you selected brawler at constants.py (instruction there as well).")
+    print("Enter the name of the brawler you are using to \"brawlerName\" in settings.py.")
     print("To exit bot hover cursor to the top left or bottom right corner.")
     print("")
     print(bcolors.UNDERLINE + "IMPORTANT - make sure to disable ads on bluestack and close the right sidebar" + bcolors.ENDC)
+    
     while True:
         print("")
         print("1. Start Bot")
@@ -145,6 +143,7 @@ if __name__ == "__main__":
         # run the bot
         if user_input == "1" or user_input == "start bot":
             main()
+        
         # use cmd to start a shutdown timer
         elif user_input == "2" or user_input == "set shutdown timer":
             print("Set Shutdown Timer")
@@ -155,10 +154,12 @@ if __name__ == "__main__":
                 print(f"Shuting down in {hour} hour")
             except ValueError:
                 print("Please enter a valid input!")
+        
         # use cmd to cancel shutdown timer
         elif user_input == "3" or user_input == "cancel shutdown timer":
             os.system('cmd /c "shutdown -a"')
             print("Shutdown timer cancelled")
+        
         # exit
         elif user_input =="4" or user_input == "exit":
             print("Exitting...")

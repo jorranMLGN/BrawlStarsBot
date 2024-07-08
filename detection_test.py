@@ -2,9 +2,9 @@ import cv2 as cv
 from time import sleep
 from modules.windowcapture import WindowCapture
 from modules.detection import Detection
-from constants import Constants
+from settings import Settings
 
-wincap = WindowCapture(Constants.window_name)
+wincap = WindowCapture(Settings.window_name)
 # get window dimension
 windowSize = wincap.get_dimension()
 # set target window as foreground
@@ -12,7 +12,7 @@ sleep(0.5)
 wincap.set_window()
 
 # initialize detection class
-detector = Detection(windowSize,Constants.model_file_path,Constants.classes,Constants.heightScaleFactor)
+detector = Detection(windowSize,Settings.model_file_path,Settings.classes)
 
 wincap.start()
 detector.start()
@@ -28,6 +28,7 @@ while(True):
     detector.update(screenshot)
     detector.annotate_detection_midpoint()
     detector.annotate_fps(wincap.avg_fps)
+    detector.annotate_border(bot.border_size,bot.tile_w,bot.tile_h)
     cv.imshow("Detection test",detector.screenshot)
 
     # press 'q' with the output window focused to exit.

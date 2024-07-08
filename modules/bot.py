@@ -4,15 +4,17 @@ from math import *
 import pyautogui as py
 import numpy as np
 import random
-from constants import Constants
+from settings import Settings
+
+
 """
 INITIALIZING: Initialize the bot
 SEARCHING: Find the nearby bush to player
 MOVING: Move to the selected bush
 HIDING: Stop movement and hide in the bush
 ATTACKING: Player will attack and activate gadget when enemy is nearby
-
 """
+# Using class as enum
 class BotState:
     INITIALIZING = 0
     SEARCHING = 1
@@ -24,12 +26,12 @@ class Brawlbot:
     # In game tile width and height ratio with respect aspect ratio
     tile_w = 24
     tile_h = 17
-    midpoint_offset = Constants.midpoint_offset
+    midpoint_offset = Settings.midpointOffsetScale
 
     # Map with sharp corners
-    sharpCorner = Constants.sharpCorner
+    sharpCorner = Settings.sharpCorner
     # Either go to the closest bush to the player or the center
-    centerOrder = Constants.centerOrder
+    centerOrder = Settings.centerOrder
     IGNORE_RADIUS = 0.5
     movement_screenshot = None
     screenshot = None
@@ -312,7 +314,7 @@ class Brawlbot:
                 player_pos = self.results[self.player_index][0]
             tileDistance = self.tile_distance(player_pos,(x,y))
             x,y = self.get_screen_position((x,y))
-            py.mouseDown(button=Constants.movement_key,x=x, y=y)
+            py.mouseDown(button=Settings.movement_key,x=x, y=y)
             moveTime = tileDistance/self.speed
             moveTime = moveTime * self.timeFactor
             print(f"Distance: {round(tileDistance,2)} tiles")
@@ -595,18 +597,18 @@ class Brawlbot:
                         self.lock.release()
 
             elif self.state == BotState.MOVING:
-                # when player is moving check if player is stuck
-                if self.have_stopped_moving():
-                    # cancel moving
-                    py.mouseUp(button = Constants.movement_key)
-                    self.stuck_random_movement()
-                    # and search for bush again
-                    self.lock.acquire()
-                    self.state = BotState.SEARCHING
-                    self.lock.release()
-                #if player is stuck
-                else:
-                    sleep(0.15)
+                # # when player is moving check if player is stuck
+                # if self.have_stopped_moving():
+                #     # cancel moving
+                #     py.mouseUp(button = Settings.movement_key)
+                #     self.stuck_random_movement()
+                #     # and search for bush again
+                #     self.lock.acquire()
+                #     self.state = BotState.SEARCHING
+                #     self.lock.release()
+                # #if player is stuck
+                # else:
+                #     sleep(0.15)
 
                 if self.is_enemy_in_range():
                     self.lock.acquire()
@@ -614,7 +616,7 @@ class Brawlbot:
                     self.lock.release()
                 # player successfully travel to the selected bush
                 if time() > self.timestamp + self.moveTime:
-                    py.mouseUp(button = Constants.movement_key)
+                    py.mouseUp(button = Settings.movement_key)
                     print("Hiding")
                     self.lock.acquire()
                     # change state to hiding
