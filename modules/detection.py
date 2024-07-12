@@ -3,6 +3,7 @@ from time import time
 import cv2 as cv
 from settings import Settings
 from ultralytics import YOLO
+import numpy as np
 
 class Detection:
     # threading properties
@@ -19,7 +20,11 @@ class Detection:
     player_bottomright = None
     midpoint_offset = Settings.midpointOffsetScale
 
-    def __init__(self, windowSize, model_file_path, classes):
+
+
+    red = (0,0,255)
+
+    def __init__(self, wincap, model_file_path, classes):
         """
         Constructor for the Detection class
         """
@@ -30,26 +35,31 @@ class Detection:
         if Settings.nvidia_gpu:
             self.model.cuda()
         self.classes = classes
-        self.windowSize = windowSize
-        self.w = windowSize[0]
-        self.h = windowSize[1]
-        self.midpoint = (int(self.w/2),int((self.h/2)+self.midpoint_offset))
-        
-
+        self.wincap = wincap
+        self.windowSize = wincap.get_dimension()
+        self.w = self.windowSize[0]
+        self.h = self.windowSize[1]
+        self.window_center = wincap.get_brawler_center()
+    
         if Settings.heightScale:
             self.heightScale = Settings.heightScale
         else:
             self.heightScale = 0.15 # default hsf
         self.height = self.h * self.heightScale
+        self.areaThreshold = int(2**2*self.wincap.tilePerWidth*self.wincap.tilePerHeight)
+        self.windowScaleFactor = 1
 
     # The find_midpoint function finds the midpoint of the bounding box of the detection
     # x2 > x1, y2 > y1
-    def find_midpoint(self,x1,y1,x2,y2):
-        return [(x1+int((x2-x1)/2),y1+int((y2-y1)/2))]
+    def xyxy_to_xywh(self,x1,y1,x2,y2):
+        return x1+int((x2-x1)/2),y1+int((y2-y1)/2),x2-x1,y2-y1
 
-    def caculate_heightScale(self):
-        results = self.model.predict(self.screenshot, imgsz=Settings.imgsz,
+    def predict(self,screenshot):
+        return self.model.predict(screenshot, imgsz=Settings.imgsz,
                                         half=Settings.half, verbose=False)
+        
+    def caculate_heightScale(self):
+        results = self.predict(self.screenshot)
         result = results[0]
         for box in result.boxes:
             x1, y1, x2, y2 = [round(x) for x in box.xyxy[0].tolist()]
@@ -57,9 +67,9 @@ class Detection:
             prob = round(box.conf[0].item(), 2)
             threshold = Settings.threshold[class_id]
             if prob >= threshold:
-                midpoint = self.find_midpoint(x1,y1,x2,y2)
+                midpoint = self.xyxy_to_xywh(x1,y1,x2,y2)
                 if self.classes[class_id] == "Player":
-                    return abs(midpoint[0][1] - self.midpoint[1])/self.h
+                    return abs(midpoint[0][1] - self.window_center[1])/self.h
 
 
     def annotate_detection_midpoint(self):
@@ -67,18 +77,21 @@ class Detection:
         annotate detection
         """
         thickness = 1
-        red = (0, 0, 255) # bgr
+
         if self.results:
             for i in range(len(self.results)):
                     #if the list is not empty
                     if self.results[i]:
-                        for cord in self.results[i]:
+                        for count, cord in enumerate(self.results[i]):
+                            color = (0, 0, 255) # bgr
+                            if count == 0 and i ==1:
+                                color = (0,255,0)
                             cv.drawMarker(self.screenshot, cord,
-                                           red ,thickness=thickness,
+                                           color ,thickness=thickness,
                                            markerType= cv.MARKER_CROSS,
                                            line_type=cv.LINE_AA, markerSize=50)
                             cv.putText(self.screenshot, self.classes[i],
-                                       cord, cv.FONT_HERSHEY_SIMPLEX, 0.7, red, 2)
+                                       cord, cv.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
     def annotate_border(self,border_size,tile_w,tile_h):
         """
@@ -98,7 +111,7 @@ class Detection:
         yBottom = int(yBorder*((tile_h+size)/2))+self.midpoint_offset
         
         cv.rectangle(self.screenshot, (xTop, yTop), (xBottom, yBottom), (0,255,0), 2)
-        cv.drawMarker(self.screenshot,self.midpoint,
+        cv.drawMarker(self.screenshot,self.window_center,
                     green ,thickness=thickness,markerType= cv.MARKER_CROSS,
                     line_type=cv.LINE_AA, markerSize=50)
         #quadrant line
@@ -130,19 +143,13 @@ class Detection:
         cv.putText(self.screenshot,text=f"FPS",
                     org=(0+spacing+int(scale*140),self.windowSize[1]-spacing),fontFace=cv.FONT_HERSHEY_SIMPLEX,fontScale=0.5*fontScale,
                     color=(255,255,255),thickness=thickness)
-    
+        
     def update(self, screenshot):
-        """
-        update screen for detection
-        """
         self.lock.acquire()
         self.screenshot = screenshot
         self.lock.release()
 
     def start(self):
-        """
-        start detection
-        """
         self.stopped = False
         self.loop_time = time()
         self.count = 0
@@ -151,38 +158,62 @@ class Detection:
         t.start()
 
     def stop(self):
-        """
-        stop detection
-        """
         self.stopped = True
 
     def run(self):
         while not self.stopped:
+            self.screenshot = self.wincap.get_screenshot()
             if not self.screenshot is None:
-                # create empty nested list
-                tempList = len(self.classes)*[[]]
-                results = self.model.predict(self.screenshot, imgsz=Settings.imgsz,
-                                             half=Settings.half, verbose=False)
+                # create empty nested list e.g. [[(..., ...),(..., ...)],[(..., ...)],[(..., ...)],[(..., ...)]]
+                tempList = len(self.classes)*[[]] #np.array(len(self.classes)*[[]])
+                scaleScreenshot = cv.resize(self.screenshot,(self.wincap.w//self.windowScaleFactor, self.wincap.h//self.windowScaleFactor))
+                results = self.predict(scaleScreenshot)
                 result = results[0]
+                rectangles = []
+                largestArea = 0
+
                 for box in result.boxes:
-                    x1, y1, x2, y2 = [round(x) for x in box.xyxy[0].tolist()]
-                    class_id = int(box.cls[0].item())
                     prob = round(box.conf[0].item(), 2)
+                    class_id = int(box.cls[0].item())
                     threshold = Settings.threshold[class_id]
+
                     if prob >= threshold:
-                        midpoint = self.find_midpoint(x1,y1,x2,y2)
+                        x1, y1, x2, y2 = [round(self.windowScaleFactor*x) for x in box.xyxy[0].cuda().tolist()]
+                        x, y, w, h = self.xyxy_to_xywh(x1,y1,x2,y2)
+
                         if self.classes[class_id] == "Player":
                             # Constantly update player name tag position to check if
                             # player is damaged in bot module while in hiding state
                             self.player_topleft = (x1,y1)
                             self.player_bottomright = (x2,y2)
-                            midpoint =  [( midpoint[0][0], int(midpoint[0][1] + self.height))]
-                        if self.classes[class_id] == "Enemy":
-                            #standardised enemy height and their label
-                            enemy_height = y2 - y1
-                            y1 = y1 + (enemy_height+0.2*self.h)
-                            midpoint = [( midpoint[0][0], int(midpoint[0][1] + 0.05*self.h))]
-                        tempList[class_id] = tempList[class_id] + midpoint
+                            y = y + int(self.height)
+                        
+                        elif self.classes[class_id] == "Enemy":
+                            y = y + int(0.05*self.h)
+                        
+                        elif self.classes[class_id] == "Bush":
+                            area = w*h
+                            if area < self.areaThreshold:
+                                continue # skip bushes
+                            if area > largestArea:
+                                largestArea = area
+                                if tempList[class_id]:
+                                    tempList[class_id][0] = (x,y)
+                                continue # skip appending to the 
+                                
+                        tempList[class_id] = tempList[class_id] + [(x,y)]
+
+                        # cv.rectangle(self.screenshot, (x1, y1), (x2, y2), (0,255,0), 2)
+                        # cv.putText(self.screenshot, f"{result.names[class_id]}: {prob}", (x1, y1), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2)
+                
+                # iou_threshold = 0
+                # rectangles = self.merge_boxes(rectangles, iou_threshold)
+
+                # for x1,y1,x2,y2 in rectangles:
+                #     x, y, w, h = self.xyxy_to_xywh(x1,y1,x2,y2)                 
+                #     tempList[1] = tempList[1] + [(x,y)]
+                #     cv.rectangle(self.screenshot, (x1, y1), (x1+w, y1+h), (0,255,0), 2)
+
                 # lock the thread while updating the results
                 self.lock.acquire()
                 self.results = tempList

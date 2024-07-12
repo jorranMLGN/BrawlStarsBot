@@ -5,6 +5,8 @@ from ctypes import windll
 import tkinter
 from time import time
 from settings import Settings
+import cv2 as cv
+from math import *
 
 class WindowCapture:
 
@@ -12,6 +14,7 @@ class WindowCapture:
     stopped = True
     lock = None
     screenshot = None
+    
     # properties
     w = 0
     h = 0
@@ -23,8 +26,18 @@ class WindowCapture:
     fps = 0
     avg_fps = 0
 
+    # input trapezium for the perspective transform 
+    TL = [426/1860,159/1046]
+    TR = [1434/1860, 159/1046]
+    BR = [1521/1860, 1]
+    BL = [338/1860, 1]
+
+
+
     # constructor
     def __init__(self, window_name=None):
+
+        ## Find DPI
         # Make program aware of DPI scaling
         # https://stackoverflow.com/a/45911849
         user32 = windll.user32
@@ -36,8 +49,10 @@ class WindowCapture:
         self.scaling = int(dpi/deafault_dpi)
         # close tkinter
         root.destroy()
+
         # create a thread lock object
         self.lock = Lock()
+        
         # find the handle for the window we want to capture.
         # if no window name is given, capture the entire screen
         if window_name is None:
@@ -45,7 +60,7 @@ class WindowCapture:
         else:
             self.hwnd = win32gui.FindWindow(None, window_name)
             if not self.hwnd:
-                raise Exception(f"{window_name} not found. \nPlease open {window_name} or change the window_name at settings.py")
+                raise Exception(f"{window_name} not found. Please open {window_name} or change the window_name at settings.py")
 
         # get the window size
         window_rect = win32gui.GetWindowRect(self.hwnd)
@@ -81,6 +96,12 @@ class WindowCapture:
         else:
             self.window = None
             self.cropped = (self.offset_x,self.offset_y)
+        
+        # tile scaling
+        self.tilePerWidth = self.w/27.35
+        self.tilePerHeight = self.h/16.97
+        self.perspectiveMatrix = self.find_perspective()
+
 
     # translate a pixel position on a screenshot image to a pixel position on the screen.
     # pos = (x, y)
@@ -95,29 +116,23 @@ class WindowCapture:
         """
         return (cordinate[0] + self.offset_x, cordinate[1] + self.offset_y)
     
-    def get_window_center(self):
+    def get_brawler_center(self):
         return (self.w//2,self.h//2 + int(self.h*Settings.midpointOffsetScale))
 
     # https://stackoverflow.com/a/15503675
-    def set_window(self):
-        """
-        forcus the selected window
-        """
+    # Focus the selected window
+    def focus_window(self):
         if self.hwnd:
             shell = win32com.client.Dispatch("WScript.Shell")
             shell.SendKeys('%')
             win32gui.SetForegroundWindow(self.hwnd)
 
+    # Returns the dimension of the window
     def get_dimension(self):
-        """
-        get the width and the height of the select window
-        """
-        return self.w,self.h
+        return self.w, self.h
 
+    # Take a screenshot of the window
     def get_screenshot(self):
-        """
-        take a screenshot
-        """
         # get the window image data
         wDC = win32gui.GetWindowDC(self.window)
         dcObj = win32ui.CreateDCFromHandle(wDC)
@@ -163,11 +178,34 @@ class WindowCapture:
                 print(hex(hwnd), f"\"{win32gui.GetWindowText(hwnd)}\"")
         win32gui.EnumWindows(winEnumHandler, None)
 
+    def find_perspective(self):
+        inputCorners = np.float32([[self.TL[0]*self.w,self.TL[1]*self.h], 
+                                   [self.TR[0]*self.w,self.TR[1]*self.h], 
+                                   [self.BR[0]*self.w,self.BR[1]*self.h], 
+                                   [self.BL[0]*self.w,self.BL[1]*self.h]])
+        # Calculate the width and height of the new perspective
+        outputWidth = round(hypot(inputCorners [0, 0] - inputCorners [1, 0], inputCorners [0, 1] - inputCorners [1, 1]))
+        outputHeight = round(hypot(inputCorners [0, 0] - inputCorners [3, 0], inputCorners [0, 1] - inputCorners [3, 1]))
+        
+        # Set the upper left coordinates for the output rectangle
+        x, y = inputCorners[0, 0], inputCorners[0, 1]
+
+        # Specify output coordinates for corners of red quadrilateral in order TL, TR, BR, BL as x, y
+        outputCorners = np.float32([[x, y], [x + outputWidth, y], [x + outputWidth, y + outputHeight], [x, y + outputHeight]])
+
+        # Compute the perspective transformation matrix
+        matrix = cv.getPerspectiveTransform(inputCorners, outputCorners)
+        return matrix
+    
+    # Function to transform a coordinate from the input plane to the output plane
+    def transform_coordinate(self,point):
+        pointHomogeneous = np.array([point[0], point[1], 1.0])
+        transformedPointHomogeneous = np.dot(self.perspectiveMatrix, pointHomogeneous)
+        transformedPointHomogeneous /= transformedPointHomogeneous[2]
+        return int(transformedPointHomogeneous[0]), int(transformedPointHomogeneous[1])
+    
     # threading methods
     def start(self):
-        """
-        start windowcapture
-        """
         self.stopped = False
         self.loop_time = time()
         self.count = 0
@@ -176,9 +214,6 @@ class WindowCapture:
         t.start()
 
     def stop(self):
-        """
-        stop windowcapture
-        """
         self.stopped = True
 
     def run(self):

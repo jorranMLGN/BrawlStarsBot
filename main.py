@@ -32,7 +32,7 @@ def main():
     windowSize = wincap.get_dimension()
     # set target window as foreground
     sleep(0.5)
-    wincap.set_window()
+    wincap.focus_window()
 
     # initialize detection class
     detector = Detection(windowSize,Settings.model_file_path,Settings.classes)
@@ -47,7 +47,7 @@ def main():
 
     #start thread
     detector.start()
-    screendetect.start()
+    # screendetect.start()
     
     print(f"Resolution: {wincap.screen_resolution}")
     print(f"Window Size: {windowSize}")

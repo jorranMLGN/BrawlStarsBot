@@ -7,6 +7,10 @@ import pyautogui as py
 from threading import Thread, Lock
 from time import sleep
 from settings import Settings
+import turtle
+import numpy as np
+from PIL import Image
+from random import *
 
 """
 IDLE: When state exit,play and load is finished, state is changed to IDLE so
@@ -40,10 +44,11 @@ class Detectstate:
     STARDROP = 8
     
 class Screendetect:
+    stopped = None
     #RGB value
     defeatedColor = (62,0,0)
     playColor = (224, 186, 8)
-    loadColor = (0, 1, 0)
+    loadColor = (239, 24, 24)
     proceedColor = (35, 115, 255)
     connection_lost_color = (66, 66, 66)
     starDropColor = (222, 72, 227)
@@ -66,19 +71,25 @@ class Screendetect:
         self.starDrop1 = self.round_offset_cord(0.488,0.9303)
         self.starDrop2 = self.round_offset_cord(0.5228,0.9296)
             
-            # buttons
+        # buttons
         self.playAgainButton = self.round_offset_cord(0.5903,0.9197)
         self.playButton = self.round_offset_cord(0.9419,0.8949)
         self.exitButton = self.round_offset_cord(0.493,0.9187)
-        self.loadButton = self.round_offset_cord(0.8057,0.9675)
+        self.loadCord1 = self.round_offset_cord(0.0129,0.0669)
+        self.loadCord2 = self.round_offset_cord(0.114,0.0746)
         self.proceedButton = self.round_offset_cord(0.8093,0.9165)
 
         self.connection_lost_cord = self.round_offset_cord(0.4912,0.5525)
         self.reload_button = self.round_offset_cord(0.2824,0.5812)
 
-    
     def round_offset_cord(self,x,y):
         return (round(self.w*x)+self.offset_x, round(self.h*y)+self.offset_y)
+
+    def convert_offset_to_normal(self,x,y):
+        return  (x-self.offset_x, y-self.offset_y)
+
+    def bgr_to_rgb(self,bgr):
+        return (bgr[-1],bgr[1],bgr[0])
 
     def goto_training(self,delay=1):
         menu = self.round_offset_cord(0.9525,0.0454)
@@ -118,6 +129,63 @@ class Screendetect:
         """
         self.stopped = True
 
+    # https://stackoverflow.com/a/66405993
+    def display_detect_pixel(self):
+        def setwindowsize(x=640, y=640):
+            turtle.setup(x, y)
+            turtle.setworldcoordinates(0,0,x,y)
+            turtle.bgcolor(0,0,0)
+
+        def drawpixel(cord,color,pixelsize=1):
+            x,y = cord 
+            turtle.tracer(0, 0)
+            turtle.colormode(255)
+            turtle.penup()
+            turtle.setpos(x*pixelsize,y*pixelsize)
+            turtle.color(color)
+            turtle.pendown()
+            turtle.begin_fill()
+            for i in range(4):
+                turtle.forward(pixelsize)
+                turtle.right(90)
+            turtle.end_fill()
+
+        def showimage():
+            turtle.hideturtle()
+            turtle.update()
+
+        setwindowsize(self.w,self.h)
+        drawpixel(self.convert_offset_to_normal(self.loadCord1[0], self.loadCord1[1]),self.bgr_to_rgb(self.loadColor))
+        drawpixel(self.convert_offset_to_normal(self.playAgainButton[0], self.playAgainButton[1]),self.bgr_to_rgb(self.playColor))
+        drawpixel(self.convert_offset_to_normal(self.defeated1[0], self.defeated1[1]),self.bgr_to_rgb(self.defeatedColor))
+        drawpixel(self.convert_offset_to_normal(self.defeated2[0], self.defeated2[1]),self.bgr_to_rgb(self.defeatedColor))
+        drawpixel(self.convert_offset_to_normal(self.starDrop1[0], self.starDrop1[1]),self.bgr_to_rgb(self.starDropColor))
+        drawpixel(self.convert_offset_to_normal(self.starDrop2[0], self.starDrop2[1]),self.bgr_to_rgb(self.starDropColor))
+        drawpixel(self.convert_offset_to_normal(self.playButton[0], self.playButton[1]),self.bgr_to_rgb(self.playColor))
+        drawpixel(self.convert_offset_to_normal(self.proceedButton[0], self.proceedButton[1]),self.bgr_to_rgb(self.proceedColor))
+        showimage()             
+
+    def is_load_in(self):
+        return (py.pixelMatchesColor(self.loadCord1[0], self.loadCord1[1],self.loadColor,tolerance=30) or 
+                    py.pixelMatchesColor(self.loadCord2[0], self.loadCord2[1],self.loadColor,tolerance=30))
+
+    def is_play_again_button(self):
+        return py.pixelMatchesColor(self.playAgainButton[0], self.playAgainButton[1],self.playColor,tolerance=15)
+
+    def is_exit(self):
+        return (py.pixelMatchesColor(self.defeated1[0], self.defeated1[1],
+                                                     self.defeatedColor,tolerance=15)
+                        or py.pixelMatchesColor(self.defeated2[0], self.defeated2[1],
+                                                     self.defeatedColor,tolerance=15)) and not(self.bot_stopped)
+    def is_star_drop(self):
+        return (py.pixelMatchesColor(self.starDrop1[0], self.starDrop1[1], self.starDropColor,tolerance=15)
+                    or py.pixelMatchesColor(self.starDrop2[0], self.starDrop2[1], self.starDropColor,tolerance=15))
+    def is_play_button(self):
+        return py.pixelMatchesColor(self.playButton[0], self.playButton[1], self.playColor, tolerance=15)
+    
+    def is_proceed_button(self):
+        return py.pixelMatchesColor(self.proceedButton[0], self.proceedButton[1], self.proceedColor, tolerance=25)
+    
     def run(self):
         while not self.stopped:
             sleep(0.01)
@@ -127,23 +195,20 @@ class Screendetect:
             
             elif self.state == Detectstate.DETECT:
                 try:
-                    if py.pixelMatchesColor(self.playAgainButton[0], self.playAgainButton[1],self.playColor,tolerance=15):
+                    if self.is_play_again_button():
                         print("Playing again")
                         self.lock.acquire()
                         self.state = Detectstate.PLAY_AGAIN
                         self.lock.release()
                     
-                    elif py.pixelMatchesColor(self.loadButton[0], self.loadButton[1],self.loadColor,tolerance=30):
+                    elif py.pixelMatchesColor(self.loadCord1[0], self.loadCord1[1],self.loadColor,tolerance=30):
                         print("Loading in")
                         self.lock.acquire()
                         sleep(6)
                         self.state = Detectstate.LOAD
                         self.lock.release()
                     
-                    elif (py.pixelMatchesColor(self.defeated1[0], self.defeated1[1],
-                                                     self.defeatedColor,tolerance=15)
-                        or py.pixelMatchesColor(self.defeated2[0], self.defeated2[1],
-                                                     self.defeatedColor,tolerance=15)) and not(self.bot_stopped):
+                    elif self.is_exit():
                         print("Exiting match")
                         self.lock.acquire()
                         self.state = Detectstate.EXIT
@@ -155,20 +220,19 @@ class Screendetect:
                     #     self.state = Detectstate.CONNECTION
                     #     self.lock.release()
                     
-                    elif (py.pixelMatchesColor(self.starDrop1[0], self.starDrop1[1], self.starDropColor,tolerance=15)
-                    or py.pixelMatchesColor(self.starDrop2[0], self.starDrop2[1], self.starDropColor,tolerance=15)):
+                    elif self.is_star_drop():
                         print("Collecting Star Drop")
                         self.lock.acquire()
                         self.state = Detectstate.STARDROP
                         self.lock.release()
                         
-                    elif py.pixelMatchesColor(self.playButton[0], self.playButton[1], self.playColor, tolerance=15):
+                    elif self.is_play_button():
                         print("Play")
                         self.lock.acquire()
                         self.state = Detectstate.PLAY
                         self.lock.release()
 
-                    elif py.pixelMatchesColor(self.proceedButton[0], self.proceedButton[1], self.proceedColor, tolerance=25):
+                    elif self.is_proceed_button():
                         print("Proceed")
                         self.lock.acquire()
                         self.state = Detectstate.PROCEED

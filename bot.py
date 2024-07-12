@@ -3,9 +3,7 @@ from threading import Thread, Lock
 from math import *
 import pyautogui as py
 import numpy as np
-import random
 from settings import Settings
-import cv2 as cv
 from modules.windowcapture import WindowCapture
 from scipy.spatial import distance
 
@@ -26,17 +24,12 @@ class BotState:
 
 class Brawlbot:
     player_index = 0
+    bush_index = 1
     enemy_index = 2
     results = None
     enemyDistance = None
     lastPlayerCord = None
-    
     INITIALIZING_SECONDS = 2
-    # input trapezium for the perspective transform 
-    TL = [426/1860,159/1046]
-    TR = [1434/1860, 159/1046]
-    BR = [1521/1860, 1]
-    BL = [338/1860, 1]
 
     def __init__(self,wincap:WindowCapture,speed:float,attack_range:float) -> None:
         self.lock = Lock()
@@ -44,7 +37,7 @@ class Brawlbot:
         # "brawler" chracteristic
         self.speed = speed
         # short range
-        if attack_range >0 and attack_range <=4:
+        if attack_range > 0 and attack_range <=4:
             range_multiplier = 1
             hide_multiplier = 1.3
         # medium range
@@ -65,77 +58,55 @@ class Brawlbot:
 
         self.wincap = wincap
         self.windowWidth, self.windowHeight = wincap.get_dimension()
-        self.center_window = wincap.get_window_center()
-        self.tilePerWidth = self.windowWidth/27.35
-        self.tilePerHeight = self.windowHeight/16.97
-        self.perspectiveMatrix = self.find_perspective()
+        self.brawlerCenter = wincap.get_brawler_center()
 
         self.state = BotState.INITIALIZING
         self.timestamp = time()
 
-    def find_perspective(self):
-        inputCorners = np.float32([[self.TL[0]*self.windowWidth,self.TL[1]*self.windowHeight], 
-                                   [self.TR[0]*self.windowWidth,self.TR[1]*self.windowHeight], 
-                                   [self.BR[0]*self.windowWidth,self.BR[1]*self.windowHeight], 
-                                   [self.BL[0]*self.windowWidth,self.BL[1]*self.windowHeight]])
-        # Calculate the width and height of the new perspective
-        outputWidth = round(hypot(inputCorners [0, 0] - inputCorners [1, 0], inputCorners [0, 1] - inputCorners [1, 1]))
-        outputHeight = round(hypot(inputCorners [0, 0] - inputCorners [3, 0], inputCorners [0, 1] - inputCorners [3, 1]))
-        
-        # Set the upper left coordinates for the output rectangle
-        x, y = inputCorners[0, 0], inputCorners[0, 1]
-
-        # Specify output coordinates for corners of red quadrilateral in order TL, TR, BR, BL as x, y
-        outputCorners = np.float32([[x, y], [x + outputWidth, y], [x + outputWidth, y + outputHeight], [x, y + outputHeight]])
-
-        # Compute the perspective transformation matrix
-        matrix = cv.getPerspectiveTransform(inputCorners, outputCorners)
-        return matrix
-    
-    # Function to transform a coordinate from the input plane to the output plane
-    def transform_coordinate(self,point):
-        pointHomogeneous = np.array([point[0], point[1], 1.0])
-        transformedPointHomogeneous = np.dot(self.perspectiveMatrix, pointHomogeneous)
-        transformedPointHomogeneous /= transformedPointHomogeneous[2]
-        return int(transformedPointHomogeneous[0]), int(transformedPointHomogeneous[1])
-
-    def calculate_tile_distance(self,a,b):
+    def calculate_tile_xy(self,a,b):
         # normalise the two point by their perspective
-        a = self.transform_coordinate(a)
-        b = self.transform_coordinate(b)
-        differences = np.subtract(a,b)
-        tileDiffX = differences[0]/self.tilePerWidth
-        tileDiffY = differences[1]/self.tilePerHeight
+        a = self.wincap.transform_coordinate(a)
+        b = self.wincap.transform_coordinate(b)
+        differences = np.subtract(b,a)
+        tileDiffX = differences[0]/self.wincap.tilePerWidth
+        tileDiffY = differences[1]/self.wincap.tilePerHeight
+        return (tileDiffX,tileDiffY)
+    
+    def calculate_tile_distance(self,a,b):
+        tileDiffX, tileDiffY = self.calculate_tile_xy(a,b)
         return sqrt(tileDiffX**2+tileDiffY**2)
+    
+    def get_player_cord(self):
+        # player coordinate
+        if self.lastPlayerCord is None:
+            playerCord = self.brawlerCenter
+        else:
+            playerCord = self.lastPlayerCord
 
+        return playerCord
+    
     def ordered_enemy_by_distance(self):
         if self.results:
-            # player coordinate
-            if self.lastPlayerCord is None:
-                playerCord = self.center_window
-            else:
-                playerCord = self.lastPlayerCord
-
+            playerCord = self.get_player_cord()
             def find_distance(position):
                 return distance.euclidean(playerCord, position)
             
             enemyCords = self.results[self.enemy_index]
             enemyCords.sort(key=find_distance)
             return enemyCords
-
     
+    def calculate_bushes_tiles(self):
+        if self.results:
+            if self.results[self.bush_index]:
+                playerCord = self.get_player_cord()
+                return [round(self.calculate_tile_xy(playerCord,bushPosition)) for bushPosition in self.results[self.bush_index]]
 
     def enemy_distance(self):
         """
         Calculate the enemy distance from the player
         """
         if self.results:
-            # player coordinate
-            if self.lastPlayerCord is None:
-                playerCord = self.center_window
-            else:
-                playerCord = self.lastPlayerCord
-            
+            playerCord = self.get_player_cord()
             # enemy coordinate
             if self.results[self.enemy_index]:
                 self.enemyResults = self.ordered_enemy_by_distance()
@@ -172,7 +143,7 @@ class Brawlbot:
     # Thread 
     def run(self):
         while not self.stopped:
-            sleep(0.01)
+            sleep(1)
             if self.state == BotState.INITIALIZING:
                 # do no bot actions until the startup waiting period is complete
                 if time() > self.timestamp + self.INITIALIZING_SECONDS:
@@ -182,4 +153,6 @@ class Brawlbot:
                     self.lock.release()
             elif self.state == BotState.SEARCHING:
                 if self.results:
-                    self.enemy_distance()
+                    bushTiles = self.calculate_bushes_tiles()
+                    if len(bushTiles) == 1:
+                        print(bushTiles)

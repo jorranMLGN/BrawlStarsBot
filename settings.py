@@ -10,7 +10,7 @@ class Settings:
     e.g "8-bit" or "Larry & Lawrie"
     """
     
-    brawlerName = "Grom"
+    brawlerName = "Bibi"
     
     #! Map's characteristics
     """
@@ -49,10 +49,10 @@ class Settings:
     e.g. First element of classes is player so the first
     element of threshold is threshold for player.
     """
-    threshold = [0.4,0.47,0.43,0.65]
+    threshold = [0.4,0.4,0.43,0.65]
 
     print("")
-    print(bcolors.BOLD + bcolors.OKGREEN + "Check https://github.com/Jooi025/BrawlStarsBot for latest update" + bcolors.ENDC)
+    print(bcolors.BOLD + bcolors.OKGREEN + "Check https://github.com/Jooi025/BrawlStarsBot for the latest update!" + bcolors.ENDC)
     print("")
 
     # find brawler in the json 

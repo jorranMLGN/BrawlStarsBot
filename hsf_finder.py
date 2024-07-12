@@ -1,7 +1,5 @@
 from settings import Settings
 from modules.windowcapture import WindowCapture
-from modules.bot import Brawlbot, BotState
-from modules.screendetect import Screendetect, Detectstate
 from modules.detection import Detection
 from time import sleep
 import json
@@ -18,9 +16,9 @@ wincap = WindowCapture(Settings.window_name)
 windowSize = wincap.get_dimension()
 # set target window as foreground
 sleep(0.5)
-wincap.set_window()
+wincap.focus_window()
 # initialize detection class
-detector = Detection(windowSize,Settings.model_file_path,Settings.classes)
+detector = Detection(wincap,Settings.model_file_path,Settings.classes)
 
 heightScale = None
 while heightScale is None:
@@ -28,9 +26,7 @@ while heightScale is None:
     sleep(1)
     heightScale = detector.caculate_heightScale()
 
-
 print(f"HSF: {round(heightScale,4)}")
-
 
 brawlerStatsDict = json.load(open("brawler_stats.json"))
 brawlerStats = brawlerStatsDict[Settings.brawlerName]

@@ -16,10 +16,10 @@ windowSize = wincap.get_dimension()
 print(windowSize)
 # set target window as foreground
 sleep(0.5)
-wincap.set_window()
+wincap.focus_window()
 
 # initialize detection class
-detector = Detection(windowSize,Settings.model_file_path,Settings.classes)
+detector = Detection(wincap,Settings.model_file_path,Settings.classes)
 # initialize bot class
 bot = Brawlbot(wincap, Settings.movementSpeed, Settings.attackRange)
 
@@ -41,7 +41,7 @@ while True:
     font = cv.FONT_HERSHEY_SIMPLEX 
     
     # org 
-    org = wincap.get_window_center() 
+    org = wincap.get_brawler_center() 
     
     # fontScale 
     fontScale = 1
@@ -57,7 +57,7 @@ while True:
     if Settings.DEBUG:
         detector.annotate_detection_midpoint()
         detector.annotate_fps(wincap.avg_fps)
-        cv.drawMarker(detector.screenshot, wincap.get_window_center(),
+        cv.drawMarker(detector.screenshot, wincap.get_brawler_center(),
                 (0,255,0) ,thickness=thickness,
                 markerType= cv.MARKER_CROSS,
                 line_type=cv.LINE_AA, markerSize=50)
