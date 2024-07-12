@@ -37,9 +37,9 @@ class Pathfinder:
     def find_walkable_matrix(self):
         # find walkable matrix
         walkableMatrix = []
-        for x in range(0, self.width):
+        for y in range(0, self.height):
             temp = []
-            for y in range(0, self.height):
+            for x in range(0, self.width):
                 r, g, b, _= self.img.getpixel((x,y))
                 if (r,g,b) in self.walkable:
                     temp.append(1)
@@ -102,10 +102,8 @@ class Pathfinder:
         # angle of spawn point to the center of the map
         centerPoint = (self.width//2, self.height//2)
         angles = [self.find_angle(centerPoint,spawnPoint) for spawnPoint in spawnPoints]
-
         # sort the list into ascending order
         angles, spawnPoints = (list(t) for t in zip(*sorted(zip(angles, spawnPoints))))
-
         return (angles, spawnPoints)
 
     def display_walkable_matrix(self):
@@ -113,20 +111,21 @@ class Pathfinder:
         im = Image.new(mode="RGB", size=(self.width, self.height))
         for x in range(0, self.width):
             for y in range(0, self.height):
-                if self.matrix[x][y] == 1:
+                if self.matrix[y][x] == 1:
                     im.putpixel((x,y), (255,255,255))
                 else:
                     im.putpixel((x,y), (0,0,0))
         im.show()
 
     def find_path(self,start,end):
-        
-        start = self.grid.node(start[1],start[0])
-        end = self.grid.node(end[1],end[0])
-
-        # self.grid.cleanup()
-        path, runs = self.finder.find_path(start, end, self.grid)
-
+        start = self.grid.node(start[0],start[1])
+        end = self.grid.node(end[0],end[1])
+        path, _ = self.finder.find_path(start, end, self.grid)
         return path
-        
-pathfinder = Pathfinder('skull_creek.png')
+
+if __name__  == "__main__":
+    pathfinder = Pathfinder('skull_creek.png')
+    print(pathfinder.matrix)
+    pathfinder.display_walkable_matrix()
+    
+
