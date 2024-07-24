@@ -125,7 +125,12 @@ class Pathfinder:
 
 if __name__  == "__main__":
     pathfinder = Pathfinder('skull_creek.png')
-    print(pathfinder.matrix)
-    pathfinder.display_walkable_matrix()
-    
+    for path in pathfinder.find_path((1,1),(45,45)):
+        x,y = tuple(path)
+
+        prevX = x
+        prevY = y
+        
+        
+    pass
 

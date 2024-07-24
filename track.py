@@ -15,6 +15,16 @@ from pathfinder import Pathfinder
 def int_tuple(tuple):
     return (int(tuple[0]),int(tuple[1]))
 
+def show_map(screenshot,map,spawnpoint,bushCord,windowSize):
+    h, w, _ = map.shape
+    scale = int(windowSize[1]*0.4 / h)
+    map = cv.resize(map,(scale*w,scale*h),interpolation = cv.INTER_NEAREST)
+    cv.circle(map, tuple(scale*i for i in spawnpoint), scale, (255,0,0), 2)
+    if bushCord:
+        cv.circle(map, tuple(scale*i for i in bushCord), scale, (255,0,0), 2)
+    screenshot[0:scale*h, 0:scale*w] = map
+    return screenshot
+
 pathfinder = Pathfinder("skull_creek.png")
 
 angles = pathfinder.angles
@@ -102,28 +112,30 @@ else:
 detector = Detection(wincap,Settings.model_file_path,Settings.classes)
 detector.start()
 startTime = time()
+
+end = None
+mapImg = cv.imread("skull_creek.png",1)
 while(True):
     elsapedTime = time() - startTime
     if detector.screenshot is None:
         continue
     detector.annotate_detection_midpoint()
     bot.update_results(detector.results)
-    cv.imshow("Detection test",detector.screenshot)
+    img = show_map(detector.screenshot,mapImg,spawnpoint,end,wincap.get_dimension())
+    cv.imshow("Detection test",img)
 
     if detector.results and elsapedTime > 4:
         if detector.results[1]:
             bushCord = detector.results[1][0]
             
             x,y = bot.calculate_tile_xy(bot.lastPlayerCord,bushCord)
-            print(x,y)
+            x = round(x)
+            y = round(y)
             start = spawnpoint
             end = (int(start[0]+x),int(start[1]+y))
-
-            print(end)
-            paths = pathfinder.find_path(start,end)
-            for path in paths:
-                print(path)
-            break
+            # paths = pathfinder.find_path(start,end)
+            # for path in paths:
+            #     print(f"{path.x} {path.y}")
         
     # press 'q' with the output window focused to exit.
     key = cv.waitKey(1)
@@ -134,14 +146,5 @@ while(True):
         break
 
 cv.destroyAllWindows()
-
-cv.drawMarker(detector.screenshot, bushCord,
-                (255,0,0) ,thickness=3,
-                markerType= cv.MARKER_CROSS,
-                line_type=cv.LINE_AA, markerSize=50)
-cv.imshow("Detection test",detector.screenshot)
-cv.waitKey(0)
-
-
 print('Done.')
 
