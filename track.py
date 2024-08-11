@@ -17,7 +17,7 @@ def int_tuple(tuple):
 
 def show_map(screenshot,map,spawnpoint,bushCord,windowSize):
     h, w, _ = map.shape
-    scale = int(windowSize[1]*0.4 / h)
+    scale = int(windowSize[1]*0.6/ h)
     map = cv.resize(map,(scale*w,scale*h),interpolation = cv.INTER_NEAREST)
     cv.circle(map, tuple(scale*i for i in spawnpoint), scale, (255,0,0), 2)
     if bushCord:
@@ -66,15 +66,23 @@ while(True):
         except AttributeError:
             continue
         
+        # Visualize the results on the frame
+        annotated_frame = results[0].plot()
+
         # Plot the tracks
         for box, track_id in zip(boxes, track_ids):
             # append to track history 
             x, y, w, h = box
             track = track_history[track_id]
-            track.append((float(x), float(y))) 
+            track.append((float(x), float(y)))
+            if len(track) > 30:  # retain 90 tracks for 90 frames
+                track.pop(0)
 
-        # Visualize the results on the frame
-        annotated_frame = results[0].plot()
+            # Draw the tracking lines
+            points = np.hstack(track).astype(np.int32).reshape((-1, 1, 2))
+            cv.polylines(annotated_frame, [points], isClosed=False, color=(230, 230, 230), thickness=10)
+
+
 
         # Display the annotated frame
         cv.imshow("YOLOv8 Tracking", annotated_frame)
@@ -118,7 +126,7 @@ mapImg = cv.imread("skull_creek.png",1)
 while(True):
     elsapedTime = time() - startTime
     if detector.screenshot is None:
-        continue
+        continue    
     detector.annotate_detection_midpoint()
     bot.update_results(detector.results)
     img = show_map(detector.screenshot,mapImg,spawnpoint,end,wincap.get_dimension())
@@ -134,7 +142,7 @@ while(True):
             start = spawnpoint
             end = (int(start[0]+x),int(start[1]+y))
             # paths = pathfinder.find_path(start,end)
-            # for path in paths:
+            # for path in paths:    
             #     print(f"{path.x} {path.y}")
         
     # press 'q' with the output window focused to exit.
