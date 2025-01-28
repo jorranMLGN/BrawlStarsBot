@@ -35,7 +35,7 @@ def main():
     wincap.focus_window()
 
     # initialize detection class
-    detector = Detection(windowSize,Settings.model_file_path,Settings.classes)
+    detector = Detection(wincap, Settings.model_file_path, Settings.classes)
     # initialize screendectect class
     screendetect = Screendetect(windowSize,wincap.offsets)
     # initialize bot class
