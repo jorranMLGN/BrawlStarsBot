@@ -69,7 +69,7 @@ class Detection:
             if prob >= threshold:
                 midpoint = self.xyxy_to_xywh(x1,y1,x2,y2)
                 if self.classes[class_id] == "Player":
-                    return abs(midpoint[0][1] - self.window_center[1])/self.h
+                    return abs(midpoint[1] - self.window_center[1]) / self.h
 
 
     def annotate_detection_midpoint(self):

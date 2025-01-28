@@ -10,7 +10,7 @@ class Settings:
     e.g "8-bit" or "Larry & Lawrie"
     """
     
-    brawlerName = "Bibi"
+    brawlerName = "Jessie"
     
     #! Map's characteristics
     """
@@ -33,7 +33,7 @@ class Settings:
     focused_window = True
 
     #! Change this to True if you have Nvidia graphics card and CUDA installed
-    nvidia_gpu = None
+    nvidia_gpu = False
 
     # Main contants
     """
